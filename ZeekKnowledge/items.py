@@ -13,8 +13,8 @@ class ZeekknowledgeItem(scrapy.Item):
 
 
 class LogItem(scrapy.Item):
-    log = scrapy.Field()
-    field = scrapy.Field()
-    types = scrapy.Field()
-    attr = scrapy.Field()
-    desc = scrapy.Field()
+    log_name = scrapy.Field()
+    log_desc=scrapy.Field()
+    field_name = scrapy.Field()
+    field_type = scrapy.Field()
+    field_desc = scrapy.Field()

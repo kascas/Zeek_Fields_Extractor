@@ -15,7 +15,7 @@ class ZeekknowledgePipeline:
         self.fp = open('./Zeek Fields.csv', 'w')
 
     def process_item(self, item: LogItem, spider):
-        self.fp.write(item['log'] + '\t' + item['field'] + '\t' + item['types'] + '\t' + item['desc'] + '\n')
+        self.fp.write(item['log_name'] + '\t' + item['log_desc'] + '\t' + item['field_name'] + '\t' + item['field_type'] + '\t' + item['field_desc'] + '\n')
         return item
 
     def open_spider(self, spider):

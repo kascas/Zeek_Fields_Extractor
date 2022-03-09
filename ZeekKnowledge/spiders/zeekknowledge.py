@@ -14,34 +14,39 @@ class ZeekknowledgeSpider(scrapy.Spider):
         super().__init__(name, **kwargs)
         self.url_regex = re.compile(r'^https://docs.zeek.org/en/lts/scripts/.*::.*Info$')
         self.info_regex = re.compile(r'.*::.*Info')
-        self.log_list = []
+        self.log_dict = {}
 
     def parse(self, response):
-        log_urls = response.xpath('//tbody//a/@href').extract()
-        for url in log_urls:
-            url = response.urljoin(url)
-            if self.url_regex.findall(url):
-                self.log_list.append(url.split('#')[-1])
-                yield scrapy.Request(url, callback=self.parse_item)
+        entries = response.xpath("//code[@class='file docutils literal notranslate']")
+        for entry in entries:
+            log_name = entry.xpath(".//text()").extract_first()
+            log_desc = self.text_clean(entry.xpath("../../../td[2]/p/text()").extract_first())
+            log_url = response.urljoin(entry.xpath("../../../td[3]//a/@href").extract_first())
+            self.log_dict[log_url.split('#')[-1].replace('type-', '')] = (log_name, log_desc)
+            yield scrapy.Request(log_url, callback=self.parse_item)
 
     def parse_item(self, response, **kwargs):
         entries = response.xpath("//dl[@class='zeek type']")
-        log, fields, descs = '', [], []
+        log_name, log_desc, field_names, field_descs, exist = '', '', [], [], False
         for entry in entries:
-            id = entry.xpath('./dt/@id').extract_first()
-            if id in self.log_list:
-                log = id.replace('type-', '')
-                fields = entry.xpath("./dd//dd[@class='field-odd']//dl//dt")
-                descs = entry.xpath("./dd//dd[@class='field-odd']//dl//dd")
+            id = entry.xpath('./dt/@id').extract_first().replace('type-', '')
+            if id in self.log_dict:
+                (log_name, log_desc) = self.log_dict[id]
+                field_names = entry.xpath("./dd//dd[@class='field-odd']//dl//dt")
+                field_descs = entry.xpath("./dd//dd[@class='field-odd']//dl//dd")
+                exist = True
                 break
-        if log == '':
+        if not exist:
             raise Exception('No Log is Found')
-        for i in range(len(fields)):
+        for i in range(len(field_names)):
             item = LogItem()
-            field, desc = fields[i], descs[i]
-            item['log'] = log
-            item['field'] = field.xpath(".//text()").extract()[0].replace(': ', '')
-            item['types'] = ''.join(field.xpath(".//text()").extract()[1:])
-            # item['desc'] = ''.join(desc.xpath('string(.)').extract()).replace('\n', ' ').replace('‘', "'").replace('’', "'").replace('“', '"').replace('”', '"')
-            item['desc'] = ''.join(desc.xpath(".//text()").extract()).replace('\n', ' ').replace('‘', "'").replace('’', "'").replace('“', '"').replace('”', '"')
+            field, desc = field_names[i], field_descs[i]
+            item['log_name'] = log_name
+            item['log_desc'] = log_desc
+            item['field_name'] = field.xpath(".//text()").extract()[0].replace(': ', '')
+            item['field_type'] = ''.join(field.xpath(".//text()").extract()[1:])
+            item['field_desc'] = self.text_clean(''.join(desc.xpath(".//text()").extract()))
             yield item
+
+    def text_clean(self, s):
+        return s.replace('\n', ' ').replace('‘', "'").replace('’', "'").replace('“', '"').replace('”', '"')
